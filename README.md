@@ -4,7 +4,7 @@
 ## Anggota Kelompok
 | Nama           | NRP        | Kelas     |
 | ---            | ---        | ----------|
-|                |            |           |
+|Aqil Syafiq Dzaky|5025241200| C |
 |                |            |           |
 
 ## Link Youtube (Unlisted)
