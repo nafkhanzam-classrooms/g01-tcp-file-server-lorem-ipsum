@@ -88,6 +88,213 @@ def recv_text(sock):
 ```
 Fungsinya buat menerima text dari socket lalu mengubahnya dari bytes ke string (setelah proses recv_msg).
 
+```
+def safe_send_text(sock, text: str):
+    try:
+        send_text(sock, "TEXT")
+        send_text(sock, text)
+        return True
+    except Exception:
+        return False
+```
+Fungsinya buat ngirim text ke client dengan aman, caranya : pertama server akan mengirim text dengan "TEXT" untuk memberi tahu kalau file yang berikutnya berbentu teks, lalu kedua dia baru akan mengirimkan teks aslinya. Jika terjadi kegagalan maka return False.
+
+```
+def safe_send_file(sock, filename: str, file_data: bytes):
+    try:
+        send_text(sock, "FILE")
+        send_text(sock, filename)
+        send_msg(sock, file_data)
+        return True
+    except Exception:
+        return False
+```
+Fungsinya buat ngirim File ke client dengan aman, caranya mirip dengan sebelumnya namun bedanya sebelum ngirim file asli dia akan ngirim text berupa Judul file.
+
+```
+def disconnect_client(sock):
+    addr = client_states.get(sock, {}).get("addr")
+    if sock in input_sockets:
+        input_sockets.remove(sock)
+    if sock in client_states:
+        del client_states[sock]
+    try:
+        sock.close()
+    except Exception:
+        pass
+
+    if addr:
+        print(f"[DISCONNECTED] {addr}")
+        broadcast(f"[SERVER] {addr} left the chat.", exclude_sock=sock)
+```
+Fungsi ini digunakan untuk ngehapus in jejak client (jika dia keluar atau /quit) caranya dia ambil alamat client, apus semua dari select, dan state client, lalu print dan broadcast kalo addr itu left the chat.
+
+```
+def broadcast(message: str, exclude_sock=None):
+    dead = []
+
+    for sock in list(client_states.keys()):
+        if sock == exclude_sock:
+            continue
+        ok = safe_send_text(sock, message)
+        if not ok:
+            dead.append(sock)
+
+    for sock in dead:
+        disconnect_client(sock)
+```
+Buat ngirim pesan ke semua client yang terhubung. Caranya loop semua client, jika ok maka kirim teksnya, jika not ok (gagal) maka hapus clien (brati dia udah disconnect).
+
+```
+def handle_list(sock):
+    files = os.listdir(SERVER_FILES_DIR)
+    if not files:
+        response = "[SERVER] No files available."
+    else:
+        response = "[SERVER FILES]\n" + "\n".join(files)
+    safe_send_text(sock, response)
+```
+Fungsinya buat ngehandle fungsi /list. cara : ambil semua list di dir, kalo ga nemuin files kirim no files available, kalo nemuin kita kirim semua nama files tadi.
+
+```
+def handle_upload(sock):
+    state = client_states[sock]
+
+    filename = recv_text(sock)
+    if filename is None:
+        disconnect_client(sock)
+        return
+
+    file_data = recv_msg(sock)
+    if file_data is None:
+        disconnect_client(sock)
+        return
+
+    safe_name = os.path.basename(filename)
+    save_path = os.path.join(SERVER_FILES_DIR, safe_name)
+
+    with open(save_path, "wb") as f:
+        f.write(file_data)
+
+    safe_send_text(sock, f"[SERVER] Upload success: {safe_name} ({len(file_data)} bytes)")
+    broadcast(f"[SERVER] {state['addr']} uploaded file: {safe_name}", exclude_sock=sock)
+    print(f"[UPLOAD] {state['addr']} -> {safe_name}")
+```
+Fungsinya buat ngehandle fungsi /upload client. pertama, server ambil info client dulu, lalu ambil data nama file yang dikirim client, jika gagal disconnect. Selanjutnya ambil data file yang dikirim client, jika gagal disconnect. Lalu masukkan file ke path sesuai nama (misal nama 123.txt, maka jadi server_files/123.txt). Lalu simpan ke disk, dan beri feedback ke uploader, kasih info juga ke client lain.
+
+```
+def handle_download(sock):
+    filename = recv_text(sock)
+    if filename is None:
+        disconnect_client(sock)
+        return
+
+    safe_name = os.path.basename(filename)
+    file_path = os.path.join(SERVER_FILES_DIR, safe_name)
+
+    if not os.path.isfile(file_path):
+        safe_send_text(sock, f"[SERVER] File not found: {safe_name}")
+        return
+
+    with open(file_path, "rb") as f:
+        file_data = f.read()
+
+    ok = safe_send_file(sock, safe_name, file_data)
+    if ok:
+        print(f"[DOWNLOAD] {client_addrs[sock.fileno()]} <- {safe_name}")
+    else:
+        disconnect_client(sock)
+```
+Fungsinya buat ngehandle /download client, pertama ambil nama file yang ingin diunduh dari client. lalu buat path ke dir untuk persiapan unduh. Jika file tidak ditemukan di server, maka return teks file not found, jika ada baca file dari disk lalu kirim ke client. Kalau gagal kirim disconnect, kalo berhasil feedback.
+
+```
+def handle_chat(sock):
+    text = recv_text(sock)
+    if text is None:
+        disconnect_client(sock)
+        return
+
+    msg = f"[{client_addrs[sock.fileno()]}] {text}"
+    print(msg)
+    broadcast(msg)
+```
+Fungsinya buat handle chat (misal client isi teks gtu), ambil teks yang dikirim client lalu tampilkan ke server dan semua client dengan format `[(ip, port)] isi pesan`.
+
+```
+def main():
+    global server_socket, poll_obj
+
+    os.makedirs(SERVER_FILES_DIR, exist_ok=True)
+
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_socket.bind((HOST, PORT))
+    server_socket.listen(5)
+
+    poll_obj = select.poll()
+    poll_obj.register(server_socket.fileno(), select.POLLIN)
+
+    fd_to_socket[server_socket.fileno()] = server_socket
+
+    print(f"[LISTENING - POLL] {HOST}:{PORT}")
+
+    try:
+        while True:
+            events = poll_obj.poll()
+
+            for fd, event in events:
+                sock = fd_to_socket.get(fd)
+                if sock is None:
+                    continue
+
+                if sock == server_socket:
+                    client_sock, client_addr = server_socket.accept()
+                    fd_to_socket[client_sock.fileno()] = client_sock
+                    client_addrs[client_sock.fileno()] = client_addr
+                    poll_obj.register(client_sock.fileno(), select.POLLIN)
+
+                    print(f"[CONNECTED] {client_addr}")
+                    safe_send_text(client_sock, f"[SERVER] Connected as {client_addr}")
+                    broadcast(f"[SERVER] {client_addr} joined the chat.",
+                              exclude_fd=client_sock.fileno())
+
+                elif event & select.POLLIN:
+                    command = recv_text(sock)
+                    if command is None:
+                        disconnect_client(sock)
+                        continue
+
+                    if command == "LIST":
+                        handle_list(sock)
+
+                    elif command == "UPLOAD":
+                        handle_upload(sock)
+
+                    elif command == "DOWNLOAD":
+                        handle_download(sock)
+
+                    elif command == "CHAT":
+                        handle_chat(sock)
+
+                    else:
+                        safe_send_text(sock, f"[SERVER] Unknown command: {command}")
+
+                elif event & (select.POLLHUP | select.POLLERR | select.POLLNVAL):
+                    disconnect_client(sock)
+
+    except KeyboardInterrupt:
+        print("\n[SERVER] Shutting down...")
+
+    finally:
+        for sock in list(fd_to_socket.values()):
+            try:
+                sock.close()
+            except Exception:
+                pass
+```
+
+
+
 ### server-poll.py
 
 ### server-thread.py
