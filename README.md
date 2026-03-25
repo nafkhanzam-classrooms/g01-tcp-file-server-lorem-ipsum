@@ -1417,3 +1417,8 @@ if __name__ == "__main__":
 Bagian ini adalah pola standar python agar fungsi `main()` langsung dijalankan saat program dijalankan.
 
 ## Screenshot Hasil
+
+<img width="1920" height="658" alt="Screenshot 2026-03-25 235217" src="https://github.com/user-attachments/assets/1bb26b84-4ff8-453c-88d8-08442e3a4981" />
+<img width="1888" height="586" alt="Screenshot 2026-03-25 235709" src="https://github.com/user-attachments/assets/9800d7bf-8f44-4f0a-b234-1d1a985485e8" />
+<img width="1920" height="504" alt="Screenshot 2026-03-25 235230" src="https://github.com/user-attachments/assets/bec70973-3680-435b-b626-3e37724292fc" />
+
