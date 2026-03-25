@@ -28,6 +28,229 @@ Link ditaruh di bawah ini
 
 ### client.py
 
+```
+import socket
+import struct
+import threading
+import os
+import sys
+```
+Dipakai untuk import fungsi-fungsi yang ada di Python. socket dan struct ini utama buat komunikasi client-server karena client juga pakai framing yang sama kayak server. threading dipakai biar client bisa nerima pesan dari server sambil tetap bisa input dari user. os dipakai untuk urusan folder/file, dan sys dipakai kalau mau ambil host atau port dari argumen terminal.
+
+```
+SERVER_HOST = "127.0.0.1"
+SERVER_PORT = 5000
+BUFFER_SIZE = 4096
+DOWNLOAD_DIR = "client_downloads"
+```
+Merupakan konstanta awal. `SERVER_HOST` sebagai alamat server tujuan client connect, default-nya 127.0.0.1 (localhost / komputer sendiri). `SERVER_PORT` sebagai port tujuan server. `BUFFER_SIZE` sebagai ukuran buffer, walaupun di kode ini sebenarnya belum kepakai. `DOWNLOAD_DIR` merupakan nama folder tempat file hasil download disimpan di client.
+
+```
+def recv_exact(sock, n):
+    data = b""
+    while len(data) < n:
+        chunk = sock.recv(n - len(data))
+        if not chunk:
+            return None
+        data += chunk
+    return data
+```
+Fungsi recv_exact berfungsi untuk menerima tepat n byte data dari socket. fungsi akan menerima data sejumlah n bytes sampai terpenuhi : misal 4 byte dan n = 2, maka recv pertama akan dapat 2 byte, recv kedua akan dapat 1 byte, dan recv ketiga akan dapat sisanya (1 byte).
+
+```
+def send_msg(sock, data: bytes):
+    header = struct.pack(">I", len(data))
+    sock.sendall(header + data)
+```
+Fungsinya sebagai pengirim pesan dengan format `[4 byte panjang data] + [isi data]` (length-prefix framing). misal aku ngirim hello maka yg ke send sebenernya header (mewakili 5 karena len 5) + isi (hello).
+
+```
+def recv_msg(sock):
+    header = recv_exact(sock, 4)
+    if not header:
+        return None
+    length = struct.unpack(">I", header)[0]
+    return recv_exact(sock, length)
+```
+Fungsinya baca data dengan format yang `[4 byte panjang data] + [isi data]` dan juga logika yang sama.
+
+```
+def send_text(sock, text: str):
+    send_msg(sock, text.encode("utf-8"))
+```
+Fungsinya buat kirim string teks ke socket
+
+```
+def recv_text(sock):
+    data = recv_msg(sock)
+    if data is None:
+        return None
+    return data.decode("utf-8", errors="replace")
+```
+Fungsinya buat menerima text dari socket lalu mengubahnya dari bytes ke string (setelah proses recv_msg).
+
+```
+def handle_server_messages(sock):
+    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+    while True:
+        try:
+            msg_type = recv_text(sock)
+            if msg_type is None:
+                print("\n[INFO] Server disconnected.")
+                break
+```
+Fungsi ini buat handle semua pesan yang dikirim dari server ke client. Di awal, client bikin folder download dulu kalau belum ada. Lalu masuk ke loop terus-terusan untuk nerima pesan dari server. Pertama ambil tipe pesan (`msg_type)`, kalau gagal (None) berarti server disconnect, jadi tampilkan info dan berhenti.
+
+```
+            if msg_type == "TEXT":
+                text = recv_text(sock)
+                if text is None:
+                    print("\n[INFO] Server disconnected.")
+                    break
+                print(f"\n{text}")
+```
+Kalau tipe pesan "TEXT", berarti server ngirim teks biasa. Client ambil isi teksnya, kalau gagal berarti koneksi putus. Kalau berhasil, langsung ditampilkan ke terminal.
+
+```
+            elif msg_type == "FILE":
+                filename = recv_text(sock)
+                if filename is None:
+                    print("\n[ERROR] Failed to receive filename.")
+                    break
+
+                file_data = recv_msg(sock)
+                if file_data is None:
+                    print("\n[ERROR] Failed to receive file data.")
+                    break
+
+                save_path = os.path.join(DOWNLOAD_DIR, os.path.basename(filename))
+                with open(save_path, "wb") as f:
+                    f.write(file_data)
+
+                print(f"\n[DOWNLOAD OK] File saved to: {save_path}")
+```
+Kalau tipe pesan "FILE", berarti server ngirim file. Pertama ambil nama file, kalau gagal tampilkan error dan berhenti. Lanjut ambil isi file dalam bentuk bytes pakai recv_msg. Kalau gagal, tampilkan error dan berhenti. Nama file diamankan pakai `basename`, lalu digabung ke folder download. Setelah itu file disimpan ke disk.alau berhasil, tampilkan info ke user kalau file sudah berhasil di-download.
+
+```
+            else:
+                print(f"\n[WARN] Unknown message type from server: {msg_type}")
+
+        except Exception as e:
+            print(f"\n[ERROR] Receiver thread stopped: {e}")
+            break
+```
+Kalau tipe pesan tidak dikenal, tampilkan warning. Kalau ada error saat menerima pesan (misalnya koneksi putus tiba-tiba), tampilkan error lalu hentikan thread receiver.
+
+```
+def main():
+    host = SERVER_HOST
+    port = SERVER_PORT
+
+    if len(sys.argv) >= 2:
+        host = sys.argv[1]
+    if len(sys.argv) >= 3:
+        port = int(sys.argv[2])
+
+    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+```
+Fungsi main/utama di sini. Bagian ini berfungsi untuk menyiapkan semuanya di sisi client. Pertama, host dan port diambil dari konstanta awal. Kalau saat run program user ngasih argumen tambahan di terminal, maka host dan port bisa diganti dari sys.argv. Setelah itu client bikin folder download kalau belum ada, lalu membuat socket client yang nanti dipakai untuk connect ke server.
+
+```
+    try:
+        sock.connect((host, port))
+        print(f"[CONNECTED] {host}:{port}")
+        print("Commands:")
+        print("  /list")
+        print("  /upload <filename>")
+        print("  /download <filename>")
+        print("  /quit")
+        print("  anything else = chat message")
+```
+Bagian ini dipakai untuk connect ke server sesuai host dan port yang dipilih. Kalau berhasil connect, tampilkan status [CONNECTED], lalu tampilkan daftar command yang bisa dipakai user, seperti /list, /upload, /download, /quit, dan selain itu dianggap sebagai chat biasa.
+
+```
+        receiver = threading.Thread(
+            target=handle_server_messages,
+            args=(sock,),
+            daemon=True
+        )
+        receiver.start()
+```
+Setelah connect, client membuat thread baru bernama `receiver` yang tugasnya menjalankan fungsi `handle_server_messages`. Thread ini dipakai supaya client bisa tetap menerima pesan atau file dari server sambil user tetap bisa input command dari terminal. Setelah dibuat, thread langsung dijalankan dengan `start()`.
+
+```
+        while True:
+            user_input = input("> ").strip()
+            if not user_input:
+                continue
+
+            if user_input == "/quit":
+                print("[INFO] Closing connection...")
+                break
+
+            elif user_input == "/list":
+                send_text(sock, "LIST")
+```
+Lalu client masuk ke loop utama untuk baca input user terus-menerus. Input dibaca dari terminal, lalu `di-strip()` supaya spasi di awal/akhir dibuang. Kalau input kosong, loop lanjut lagi tanpa melakukan apa-apa. Kalau user ngetik `/quit`, berarti client mau keluar. Maka tampilkan info kalau koneksi ditutup, lalu keluar dari loop. Kalau user ngetik /list, client kirim command "LIST" ke server. Nanti server yang akan handle daftar file yang ada.
+
+```
+            elif user_input.startswith("/upload "):
+                parts = user_input.split(maxsplit=1)
+                if len(parts) < 2:
+                    print("[ERROR] Usage: /upload <filename>")
+                    continue
+
+                filepath = parts[1]
+                if not os.path.isfile(filepath):
+                    print(f"[ERROR] File not found: {filepath}")
+                    continue
+
+                filename = os.path.basename(filepath)
+                with open(filepath, "rb") as f:
+                    file_data = f.read()
+
+                send_text(sock, "UPLOAD")
+                send_text(sock, filename)
+                send_msg(sock, file_data)
+
+                print(f"[UPLOAD SENT] {filename} ({len(file_data)} bytes)")
+```
+Kalau input diawali `/upload` , berarti user mau upload file. Input dipisah jadi command dan nama file. Kalau nama file tidak ada, tampilkan error penggunaan lalu lanjut lagi. Ambil path file dari input user. Kalau file itu tidak ditemukan di client, tampilkan error lalu lanjut lagi. Kalau file ada, ambil nama file saja pakai `basename`, lalu buka file dalam mode binary dan baca semua isinya ke `file_data`. Setelah itu client kirim command `"UPLOAD"` ke server, lalu kirim nama file, lalu kirim isi file. Kalau sudah terkirim, tampilkan info kalau upload sudah dikirim beserta ukuran filenya.
+
+```
+            elif user_input.startswith("/download "):
+                parts = user_input.split(maxsplit=1)
+                if len(parts) < 2:
+                    print("[ERROR] Usage: /download <filename>")
+                    continue
+
+                filename = parts[1]
+                send_text(sock, "DOWNLOAD")
+                send_text(sock, filename)
+            else:
+                send_text(sock, "CHAT")
+                send_text(sock, user_input)
+```
+Kalau input diawali `/download` , berarti user mau download file dari server. Input dipisah dulu. Kalau nama file tidak ada, tampilkan error penggunaan. Kalau nama file ada, client kirim command `"DOWNLOAD"` ke server, lalu kirim nama file yang mau diunduh. Nanti file hasilnya akan diterima oleh thread `handle_server_messages`. Kalau input bukan command yang dikenal, maka dianggap sebagai chat biasa. Client kirim command `"CHAT"` lalu kirim isi pesan user ke server.
+
+```
+    except KeyboardInterrupt:
+        print("\n[INFO] Interrupted by user.")
+    except Exception as e:
+        print(f"[ERROR] {e}")
+    finally:
+        try:
+            sock.close()
+        except Exception:
+            pass
+        print("[INFO] Client closed.")
+```
+Kalau user menekan `Ctrl+C`, tampilkan info kalau client dihentikan oleh user. Kalau ada error lain, tampilkan pesan error-nya. Terakhir, di bagian `finally`, socket client akan ditutup supaya koneksi selesai dengan rapi. Setelah itu tampilkan info kalau client sudah ditutup.
+
+
 ### server-sync.py
 ```
 import socket
