@@ -11,11 +11,11 @@
 ## Daftar Isi
 - [Link Youtube](#link-youtube)
 - [Penjelasan Program](#penjelasan-program)
-    - [client.py](#client.py)
-    - [server-sync.py](#server-sync.py)
-    - [server-select.py](#server-select.py)
-    - [server-poll.py](#server-poll.py)
-    - [server-thread.py](#server-thread.py)
+    - [client.py](#clientpy)
+    - [server-sync.py](#server-syncpy)
+    - [server-select.py](#server-selectpy)
+    - [server-poll.py](#server-pollpy)
+    - [server-thread.py](#server-threadpy)
 - [Screenshot Hasil](#screenshot-hasil) 
 
 ## Link Youtube (Unlisted)
