@@ -9,6 +9,7 @@
 
 
 ## Daftar Isi
+- - [Link Youtube](#https://github.com/nafkhanzam-classrooms/g01-tcp-file-server-lorem-ipsum/blob/main/README.md#penjelasan-program)
 
 ## Link Youtube (Unlisted)
 Link ditaruh di bawah ini
