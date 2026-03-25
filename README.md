@@ -19,6 +19,202 @@ Link ditaruh di bawah ini
 ### client.py
 
 ### server-sync.py
+```
+import socket
+import struct
+import os
+```
+Dipakai untuk import module yang dibutuhkan.
+
+- 'socket' dipakai untuk komunikasi jaringan client-server.
+- 'struct' dipakai untuk membungkus panjang data ke format biner 4 byte.
+- 'os' dipakai untuk urusan file dan folder, misalnya bikin folder, cek file, gabung path, dan ambil nama file aman.
+
+```
+HOST = "0.0.0.0"
+PORT = 5000
+SERVER_FILES_DIR = "server_files"
+```
+Merupakan konstanta awal, HOST sebagai tempat server bind (pakai 0.0.0.0 agar bisa diakses oleh device lain tidak local). PORT sebagai port tempat server nge-listen. SERVER_FILES_DIR merupakan nama folder tempat file disimpan deserver
+
+```
+def recv_exact(sock, n):
+    data = b""
+    while len(data) < n:
+        chunk = sock.recv(n - len(data))
+        if not chunk:
+            return None
+        data += chunk
+    return data
+```
+Merupakan fungsi yang memastikan bahwa data diterima sekaligus (sesuai besar datanya)
+
+```
+def send_msg(sock, data: bytes):
+    header = struct.pack(">I", len(data))
+    sock.sendall(header + data)
+```
+Merupakan fungsi yang dipakai untuk mengirim data dengan mengirim informasi panjang data terlebih dahulu.
+
+```
+def recv_msg(sock):
+    header = recv_exact(sock, 4)
+    if not header:
+        return None
+    length = struct.unpack(">I", header)[0]
+    return recv_exact(sock, length)
+```
+Merupakan fungsi yang diapakai untuk menerima data, dengan menerima informasi panjang terlebih dahulu.
+
+```
+def send_text(sock, text: str):
+    send_msg(sock, text.encode("utf-8"))
+```
+Merupakan fungsi untuk mengirim pesan dalam bentuk text.
+
+```
+def recv_text(sock):
+    data = recv_msg(sock)
+    if data is None:
+        return None
+    return data.decode("utf-8", errors="replace")
+```
+
+Merupakan fungsi yang dipakai untuk menerima pesan dalam bentuk text.
+
+```
+def safe_send_text(sock, text: str):
+    try:
+        send_text(sock, "TEXT")
+        send_text(sock, text)
+        return True
+    except Exception:
+        return False
+```
+Merupakan fungsi yang memastikan agar server tidak crash saat pesan rusak/gagal dikirim.
+
+```
+def safe_send_file(sock, filename: str, file_data: bytes):
+    try:
+        send_text(sock, "FILE")
+        send_text(sock, filename)
+        send_msg(sock, file_data)
+        return True
+    except Exception:
+        return False
+```
+Merupakan fungsi yang dipakai untuk mengirim suatu file ke client melalui server.
+
+```
+def handle_client(client_sock, client_addr):
+    print(f"[CONNECTED] {client_addr}")
+    safe_send_text(client_sock, f"[SERVER] Connected as {client_addr}")
+```
+Merupakan fungsi yang memastikan client sudah connect dengan cara mengirim log ke pemegang server bahwa client terkoneksi. Fungsi ini juga akan memberi pesan sambutan kepada client.
+
+```
+    try:
+        while True:
+            command = recv_text(client_sock)
+            if command is None:
+                break
+```
+Merupakan fungsi untuk melayani client, dimana server akan menungggu perintah dari client dan selama client awal belum terputus, client lain harus menunggu untuk dilayani.
+
+```
+            if command == "LIST":
+                files = os.listdir(SERVER_FILES_DIR)
+                if not files:
+                    response = "[SERVER] No files available."
+                else:
+                    response = "[SERVER FILES]\n" + "\n".join(files)
+                safe_send_text(client_sock, response)
+```
+
+Merupakan fungsi 'if' yang mendeteksi command 'LIST'. Fungsi ini digunakan saat client ingin meminta daftar file yang ada di 'server_file'.
+
+```
+            elif command == "UPLOAD":
+                filename = recv_text(client_sock)
+                if filename is None:
+                    break
+
+                file_data = recv_msg(client_sock)
+                if file_data is None:
+                    break
+
+                safe_name = os.path.basename(filename)
+                save_path = os.path.join(SERVER_FILES_DIR, safe_name)
+
+                with open(save_path, "wb") as f:
+                    f.write(file_data)
+
+                safe_send_text(
+                    client_sock,
+                    f"[SERVER] Upload success: {safe_name} ({len(file_data)} bytes)"
+                )
+                print(f"[UPLOAD] {client_addr} -> {safe_name}")
+```
+
+Merupakan fungsi 'if' yang mendeteksi command 'UPLOAD'. Fungsi ini digunakan untuk menerima file dari client ke server. Lalu saat menerima file, path dari file tersebut akan dibersihkan dahulu dengan 'os.path.basename' yang berfungsi untuk mengambil path terakhir dari file. File kemudian disimpan dengan menggunakan 'with open'. Server mengirim pemberitahuan ke client bahwa file berhasil di upload, dan dicatat log di terminal.
+
+```
+           elif command == "DOWNLOAD":
+                filename = recv_text(client_sock)
+                if filename is None:
+                    break
+
+                safe_name = os.path.basename(filename)
+                file_path = os.path.join(SERVER_FILES_DIR, safe_name)
+
+                if not os.path.isfile(file_path):
+                    safe_send_text(client_sock, f"[SERVER] File not found: {safe_name}")
+                    continue
+
+                with open(file_path, "rb") as f:
+                    file_data = f.read()
+
+                ok = safe_send_file(client_sock, safe_name, file_data)
+                if ok:
+                    print(f"[DOWNLOAD] {client_addr} <- {safe_name}")
+                else:
+                    break
+```
+
+Merupakan fungsi 'if' yang mendeteksi command 'DOWNLOAD'. Fungsi ini digunakan untuk mengirim file dari server ke client. Sebelu mengirim server akan cek file yang diminta client benar - benar ada atau tidak. Jika file ada, server akan membuka file dengna 'with open' dan mengirim ke client dengan 'safe_send_file'. Jika berhasil, server mengirim pesan sukses ke client dan mencatat log di terminal server.
+
+```
+            elif command == "CHAT":
+                text = recv_text(client_sock)
+                if text is None:
+                    break
+
+                msg = f"[{client_addr}] {text}"
+                print(msg)
+
+                safe_send_text(client_sock, msg)
+```
+merupakan fungsi 'if' yang mendeteksi command 'CHAT'. 	
+
+Alurnya:
+Server terima isi chat dari client
+Pesan diformat dengan alamat client
+Server print pesan itu di terminal
+Lalu server kirim balik pesan itu ke client yang sedang aktif (karna server-sync maka client akan menerima pesannya sendiri).
+
+```
+            else:
+                safe_send_text(client_sock, f"[SERVER] Unknown command: {command}")
+```
+Merupakan fungsi 'if' yang mendeteksi jika client tidak menggunakan command yang valid. Server akan mengirim pesan ke client bahwa command tidak valid.
+
+```
+    except Exception as e:
+        print(f"[ERROR] {client_addr}: {e}")
+```
+Merupakan fungsi yang akan mengirim pesan eror ke terminal server jika terdeteksi ada kesalahan selama proses. 
+
+
 
 ### server-select.py
 
