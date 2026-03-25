@@ -4,8 +4,9 @@
 ## Anggota Kelompok
 | Nama           | NRP        | Kelas     |
 | ---            | ---        | ----------|
+|Alfianz Rizqi Ilahi Loven Carry|5025241164|C|
 |Aqil Syafiq Dzaky|5025241200| C |
-|                |            |           |
+
 
 ## Link Youtube (Unlisted)
 Link ditaruh di bawah ini
