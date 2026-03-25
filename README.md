@@ -10,6 +10,13 @@
 
 ## Daftar Isi
 - [Link Youtube](#link-youtube)
+- [Penjelasan Program](#penjelasan-program)
+    - [client.py](#client.py)
+    - [server-sync.py](#server-sync.py)
+    - [server-select.py](#server-select.py)
+    - [server-poll.py](#server-poll.py)
+    - [server-thread.py](#server-thread.py)
+  - [Screenshot Hasil](#screenshot-hasil) 
 
 ## Link Youtube (Unlisted)
 Link ditaruh di bawah ini
