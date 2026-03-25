@@ -218,6 +218,70 @@ Merupakan fungsi `if` yang mendeteksi jika client tidak menggunakan command yang
 Merupakan fungsi yang akan mengirim pesan eror ke terminal server jika terdeteksi ada kesalahan selama proses. 
 
 
+```
+    finally:
+        try:
+            client_sock.close()
+        except Exception:
+            pass
+        print(f"[DISCONNECTED] {client_addr}")
+```
+Merupakan fungsi yang akan digunakan saat client terputus dari server. Server akan menutup socket client dan akan mencata log client disconnect.
+
+```
+def main():
+    os.makedirs(SERVER_FILES_DIR, exist_ok=True)
+```
+Merupakan fungsi `main()`. `os.makedirs` memastikan bahwa file `server_files`sudah ada. Jika belum maka akan otomatis dibuat.
+
+```
+    server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_sock.bind((HOST, PORT))
+    server_sock.listen(5)
+```
+Bagian ini dipakai untuk setup socket server:
+`AF_INET` = IPv4.
+`SOCK_STREAM` = TCP.
+`SO_REUSEADDR` = supaya port bisa dipakai ulang lebih cepat setelah server restart.
+`bind()` = menempelkan server ke host dan port.
+`listen(5)` = mulai mendengarkan koneksi masuk.
+
+```
+    print(f"[LISTENING - SYNC] {HOST}:{PORT}")
+```
+
+Bagian ini akan jadi penanda bahwa `server-sync` sudah aktif dan menunggu client masuk.
+
+```
+    try:
+        while True:
+            client_sock, client_addr = server_sock.accept()
+            handle_client(client_sock, client_addr)
+```
+
+Bagian ini adalah loop utama untuk menerima client. Bagian `handle_client` hanya akan melayani satu client dalam satu Waktu.
+
+```
+    except KeyboardInterrupt:
+        print("\n[SERVER] Shutting down...")
+```
+Bagian ini akan menuliskan pesan shutdown saat server dimatikan secara manual.
+
+```
+    finally:
+        server_sock.close()
+```
+
+bagian ini menutup socket server agar resurcenya bersih.
+
+```
+if __name__ == "__main__":
+    main()
+```
+Bagian ini adalah pola standar python agar fungsi `main()` langsung dijalankan saat program di jalankan.
+
+
 
 ### server-select.py
 
