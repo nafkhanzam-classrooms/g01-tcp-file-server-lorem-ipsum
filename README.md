@@ -197,10 +197,11 @@ Merupakan fungsi 'if' yang mendeteksi command 'DOWNLOAD'. Fungsi ini digunakan u
 merupakan fungsi 'if' yang mendeteksi command 'CHAT'. 	
 
 Alurnya:
-Server terima isi chat dari client
-Pesan diformat dengan alamat client
-Server print pesan itu di terminal
-Lalu server kirim balik pesan itu ke client yang sedang aktif (karna server-sync maka client akan menerima pesannya sendiri).
+
+- Server terima isi chat dari client
+- Pesan diformat dengan alamat client
+- Server print pesan itu di terminal
+- Lalu server kirim balik pesan itu ke client yang sedang aktif (karna server-sync maka client akan menerima pesannya sendiri).
 
 ```
             else:
