@@ -26,7 +26,7 @@ import os
 ```
 Dipakai untuk import module yang dibutuhkan.
 
-- 'socket' dipakai untuk komunikasi jaringan client-server.
+- `socket` dipakai untuk komunikasi jaringan client-server.
 - 'struct' dipakai untuk membungkus panjang data ke format biner 4 byte.
 - 'os' dipakai untuk urusan file dan folder, misalnya bikin folder, cek file, gabung path, dan ambil nama file aman.
 
