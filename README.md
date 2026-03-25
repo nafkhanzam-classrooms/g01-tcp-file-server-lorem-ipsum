@@ -27,8 +27,8 @@ import os
 Dipakai untuk import module yang dibutuhkan.
 
 - `socket` dipakai untuk komunikasi jaringan client-server.
-- 'struct' dipakai untuk membungkus panjang data ke format biner 4 byte.
-- 'os' dipakai untuk urusan file dan folder, misalnya bikin folder, cek file, gabung path, dan ambil nama file aman.
+- `struct` dipakai untuk membungkus panjang data ke format biner 4 byte.
+- `os` dipakai untuk urusan file dan folder, misalnya bikin folder, cek file, gabung path, dan ambil nama file aman.
 
 ```
 HOST = "0.0.0.0"
@@ -131,7 +131,7 @@ Merupakan fungsi untuk melayani client, dimana server akan menungggu perintah da
                 safe_send_text(client_sock, response)
 ```
 
-Merupakan fungsi 'if' yang mendeteksi command 'LIST'. Fungsi ini digunakan saat client ingin meminta daftar file yang ada di 'server_file'.
+Merupakan fungsi `if` yang mendeteksi command `LIST`. Fungsi ini digunakan saat client ingin meminta daftar file yang ada di `server_file`.
 
 ```
             elif command == "UPLOAD":
@@ -156,7 +156,7 @@ Merupakan fungsi 'if' yang mendeteksi command 'LIST'. Fungsi ini digunakan saat 
                 print(f"[UPLOAD] {client_addr} -> {safe_name}")
 ```
 
-Merupakan fungsi 'if' yang mendeteksi command 'UPLOAD'. Fungsi ini digunakan untuk menerima file dari client ke server. Lalu saat menerima file, path dari file tersebut akan dibersihkan dahulu dengan 'os.path.basename' yang berfungsi untuk mengambil path terakhir dari file. File kemudian disimpan dengan menggunakan 'with open'. Server mengirim pemberitahuan ke client bahwa file berhasil di upload, dan dicatat log di terminal.
+Merupakan fungsi `if` yang mendeteksi command `UPLOAD`. Fungsi ini digunakan untuk menerima file dari client ke server. Lalu saat menerima file, path dari file tersebut akan dibersihkan dahulu dengan `os.path.basename` yang berfungsi untuk mengambil path terakhir dari file. File kemudian disimpan dengan menggunakan `with open`. Server mengirim pemberitahuan ke client bahwa file berhasil di upload, dan dicatat log di terminal.
 
 ```
            elif command == "DOWNLOAD":
@@ -181,7 +181,7 @@ Merupakan fungsi 'if' yang mendeteksi command 'UPLOAD'. Fungsi ini digunakan unt
                     break
 ```
 
-Merupakan fungsi 'if' yang mendeteksi command 'DOWNLOAD'. Fungsi ini digunakan untuk mengirim file dari server ke client. Sebelu mengirim server akan cek file yang diminta client benar - benar ada atau tidak. Jika file ada, server akan membuka file dengna 'with open' dan mengirim ke client dengan 'safe_send_file'. Jika berhasil, server mengirim pesan sukses ke client dan mencatat log di terminal server.
+Merupakan fungsi `if` yang mendeteksi command `DOWNLOAD`. Fungsi ini digunakan untuk mengirim file dari server ke client. Sebelu mengirim server akan cek file yang diminta client benar - benar ada atau tidak. Jika file ada, server akan membuka file dengna `with open` dan mengirim ke client dengan `safe_send_file`. Jika berhasil, server mengirim pesan sukses ke client dan mencatat log di terminal server.
 
 ```
             elif command == "CHAT":
@@ -194,7 +194,7 @@ Merupakan fungsi 'if' yang mendeteksi command 'DOWNLOAD'. Fungsi ini digunakan u
 
                 safe_send_text(client_sock, msg)
 ```
-merupakan fungsi 'if' yang mendeteksi command 'CHAT'. 	
+merupakan fungsi `if` yang mendeteksi command `CHAT`. 	
 
 Alurnya:
 
@@ -207,7 +207,7 @@ Alurnya:
             else:
                 safe_send_text(client_sock, f"[SERVER] Unknown command: {command}")
 ```
-Merupakan fungsi 'if' yang mendeteksi jika client tidak menggunakan command yang valid. Server akan mengirim pesan ke client bahwa command tidak valid.
+Merupakan fungsi `if` yang mendeteksi jika client tidak menggunakan command yang valid. Server akan mengirim pesan ke client bahwa command tidak valid.
 
 ```
     except Exception as e:
@@ -374,8 +374,8 @@ def handle_upload(sock):
         f.write(file_data)
 
     safe_send_text(sock, f"[SERVER] Upload success: {safe_name} ({len(file_data)} bytes)")
-    broadcast(f"[SERVER] {state['addr']} uploaded file: {safe_name}", exclude_sock=sock)
-    print(f"[UPLOAD] {state['addr']} -> {safe_name}")
+    broadcast(f"[SERVER] {state[`addr`]} uploaded file: {safe_name}", exclude_sock=sock)
+    print(f"[UPLOAD] {state[`addr`]} -> {safe_name}")
 ```
 Fungsinya buat ngehandle fungsi /upload client. pertama, server ambil info client dulu, lalu ambil data nama file yang dikirim client, jika gagal disconnect. Selanjutnya ambil data file yang dikirim client, jika gagal disconnect. Lalu masukkan file ke path sesuai nama (misal nama 123.txt, maka jadi server_files/123.txt). Lalu simpan ke disk, dan beri feedback ke uploader, kasih info juga ke client lain.
 
@@ -398,7 +398,7 @@ def handle_download(sock):
 
     ok = safe_send_file(sock, safe_name, file_data)
     if ok:
-        print(f"[DOWNLOAD] {client_states[sock]['addr']} <- {safe_name}")
+        print(f"[DOWNLOAD] {client_states[sock][`addr`]} <- {safe_name}")
     else:
         disconnect_client(sock)
 ```
@@ -411,7 +411,7 @@ def handle_chat(sock):
         disconnect_client(sock)
         return
 
-    msg = f"[{client_states[sock]['addr']}] {text}"
+    msg = f"[{client_states[sock][`addr`]}] {text}"
     print(msg)
     broadcast(msg)
 ```
