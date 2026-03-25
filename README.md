@@ -201,7 +201,7 @@ def handle_download(sock):
 
     ok = safe_send_file(sock, safe_name, file_data)
     if ok:
-        print(f"[DOWNLOAD] {client_addrs[sock.fileno()]} <- {safe_name}")
+        print(f"[DOWNLOAD] {client_states[sock]['addr']} <- {safe_name}")
     else:
         disconnect_client(sock)
 ```
@@ -214,7 +214,7 @@ def handle_chat(sock):
         disconnect_client(sock)
         return
 
-    msg = f"[{client_addrs[sock.fileno()]}] {text}"
+    msg = f"[{client_states[sock]['addr']}] {text}"
     print(msg)
     broadcast(msg)
 ```
@@ -222,7 +222,7 @@ Fungsinya buat handle chat (misal client isi teks gtu), ambil teks yang dikirim 
 
 ```
 def main():
-    global server_socket, poll_obj
+    global server_socket
 
     os.makedirs(SERVER_FILES_DIR, exist_ok=True)
 
@@ -231,34 +231,34 @@ def main():
     server_socket.bind((HOST, PORT))
     server_socket.listen(5)
 
-    poll_obj = select.poll()
-    poll_obj.register(server_socket.fileno(), select.POLLIN)
+    input_sockets.append(server_socket)
 
-    fd_to_socket[server_socket.fileno()] = server_socket
+    print(f"[LISTENING - SELECT] {HOST}:{PORT}")
+```
+Fungsi main/utama disini, bagian diatas berfungs untuk menyiapkan segalanya : folder penyimpanan file, socket server, aktifkan reuse address, bind ke host dan port, Server nge-listen, ngemasukin server socket ke list, lalu feedback status saat ini (LISTENING).
 
-    print(f"[LISTENING - POLL] {HOST}:{PORT}")
-
+```
     try:
         while True:
-            events = poll_obj.poll()
+            read_ready, _, _ = select.select(input_sockets, [], [])
 
-            for fd, event in events:
-                sock = fd_to_socket.get(fd)
-                if sock is None:
-                    continue
-
+            for sock in read_ready:
                 if sock == server_socket:
                     client_sock, client_addr = server_socket.accept()
-                    fd_to_socket[client_sock.fileno()] = client_sock
-                    client_addrs[client_sock.fileno()] = client_addr
-                    poll_obj.register(client_sock.fileno(), select.POLLIN)
+                    input_sockets.append(client_sock)
+                    client_states[client_sock] = {
+                        "addr": client_addr
+                    }
 
                     print(f"[CONNECTED] {client_addr}")
                     safe_send_text(client_sock, f"[SERVER] Connected as {client_addr}")
-                    broadcast(f"[SERVER] {client_addr} joined the chat.",
-                              exclude_fd=client_sock.fileno())
+                    broadcast(f"[SERVER] {client_addr} joined the chat.", exclude_sock=client_sock)
 
-                elif event & select.POLLIN:
+```
+Bagian ini merupakan lanjutan main, loop (selama true), periksa semua socket dalam input_socket pakai read_ready. loop semua socket yg ready. kalo seocket yg ready server_socket (artinya ada client baru) maka accept client, masukkan ke input_socket lalu simpat state client. terakhir tambahkan log di server lalu tampilkan sambutan ke client baru (Broadcast kalau client baru joined the chat).
+
+```
+                else:
                     command = recv_text(sock)
                     if command is None:
                         disconnect_client(sock)
@@ -278,21 +278,22 @@ def main():
 
                     else:
                         safe_send_text(sock, f"[SERVER] Unknown command: {command}")
+```
+Lanjutan dari loop diatas, kalo yg diterima bukan server socket maka masuk ke command list (tinggal satu satu masukin misal /LIST maka langsung menuju handle_list, jika /UPLOAD maka ke handle upload dst. Jika tidak ada yg sesuai return Uknown Command, dan jika command ga ada/none maka disconnect.
 
-                elif event & (select.POLLHUP | select.POLLERR | select.POLLNVAL):
-                    disconnect_client(sock)
-
+```
     except KeyboardInterrupt:
         print("\n[SERVER] Shutting down...")
 
     finally:
-        for sock in list(fd_to_socket.values()):
+        for sock in list(input_sockets):
             try:
                 sock.close()
             except Exception:
                 pass
-```
 
+```
+Terakhir di main berfungsi untuk menghandle keyboard interupt (misal press ctrl+C) maka tampilkan shutting down. Lalu finally semua socket ditutup saat server disconnect 
 
 
 ### server-poll.py
